@@ -30,18 +30,24 @@ module.exports = function withMappls(config) {
     // The SDK's Gradle plugin looks for a matching *.a.olf/*.a.conf pair in
     // the generated app directory (and then embeds them into resources/assets).
     // Keep the files native-only; never pass them through EXPO_PUBLIC_* config.
-    const credentialsDir = path.join(modConfig.modRequest.projectRoot, "attached_assets");
-    const files = fs.readdirSync(credentialsDir);
-    const configSource = files.find((file) => file.endsWith(".conf"));
-    const licenseSource = files.find((file) => file.endsWith(".olf"));
-    if (!configSource || !licenseSource) {
-      throw new Error("Missing Mappls .conf/.olf credential files.");
+    const credentialsDir = path.join(modConfig.modRequest.projectRoot, "config", "mappls");
+    const credentials = [
+      {
+        source: "app1787810177396i1981201619.a_1787848537524.conf",
+        destination: "mappls.a.conf",
+      },
+      {
+        source: "app1787810177396i1981201619.a_1787848537524.olf",
+        destination: "mappls.a.olf",
+      },
+    ];
+    for (const credential of credentials) {
+      const sourcePath = path.join(credentialsDir, credential.source);
+      if (!fs.existsSync(sourcePath) || fs.statSync(sourcePath).size === 0) {
+        throw new Error(`Missing Mappls credential file: config/mappls/${credential.source}`);
+      }
+      fs.copyFileSync(sourcePath, path.join(appDir, credential.destination));
     }
-    // The SDK Gradle plugin requires these exact suffixes and matching
-    // basenames, regardless of the filenames exported by the credentials
-    // console.
-    fs.copyFileSync(path.join(credentialsDir, configSource), path.join(appDir, "mappls.a.conf"));
-    fs.copyFileSync(path.join(credentialsDir, licenseSource), path.join(appDir, "mappls.a.olf"));
     return modConfig;
   }]);
 };

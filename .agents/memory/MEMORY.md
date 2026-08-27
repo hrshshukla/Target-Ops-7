@@ -1,1 +1,2 @@
 - [Mappls native credentials](mappls-native-credentials.md) — the installed SDK Gradle plugin requires a matching basename ending in `.a.conf` and `.a.olf`.
+- [EAS signing verification](eas-signing-verification.md) — local prebuild verifies native packaging; remote EAS certificate matching requires authenticated EAS credential access.

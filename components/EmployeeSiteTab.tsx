@@ -168,6 +168,7 @@ function NativeMap({
   onCoordinateChange: (coordinate: [number, number]) => void;
 }) {
   const colors = useColors();
+  const [mapError, setMapError] = useState<string | null>(null);
   if (Platform.OS === "web") {
     return (
       <View style={[styles.mapFallback, { backgroundColor: colors.secondary }]}>
@@ -186,6 +187,27 @@ function NativeMap({
         style={StyleSheet.absoluteFill}
         logoClickEnabled={false}
         attributionEnabled
+        onWillStartLoadingMap={() => {
+          console.info("[Mappls] Native map style loading started.");
+        }}
+        onDidFinishLoadingMap={() => {
+          console.info("[Mappls] Native map style loaded successfully.");
+          setMapError(null);
+        }}
+        onDidFailLoadingMap={() => {
+          const message =
+            "Mappls failed to load the map style. Check the native Mappls credentials, package name, signing certificate, network access, and device logs.";
+          console.error("[Mappls] Native map style failed to load.", message);
+          setMapError(message);
+        }}
+        onMapError={(error: { code?: number; message?: string }) => {
+          const message = error?.message || "Mappls returned an unknown native map error.";
+          console.error("[Mappls] Native map error.", {
+            code: error?.code,
+            message,
+          });
+          setMapError(`Mappls error ${error?.code ?? "unknown"}: ${message}`);
+        }}
         onRegionDidChange={(feature: { geometry?: { coordinates?: number[] } }) => {
           const next = feature.geometry?.coordinates;
           if (next && Number.isFinite(next[0]) && Number.isFinite(next[1])) {
@@ -198,6 +220,17 @@ function NativeMap({
       <View pointerEvents="none" style={styles.pin}>
         <Feather name="map-pin" size={34} color={colors.primary} />
       </View>
+      {mapError ? (
+        <View style={[styles.mapError, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Feather name="alert-triangle" size={22} color={colors.primary} />
+          <Text style={[styles.mapErrorTitle, { color: colors.foreground }]}>
+            Mappls map unavailable
+          </Text>
+          <Text style={[styles.mapErrorText, { color: colors.secondaryForeground }]}>
+            {mapError}
+          </Text>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -235,6 +268,19 @@ const styles = StyleSheet.create({
   },
   mapFallback: { flex: 1, alignItems: "center", justifyContent: "center", gap: 8 },
   mapFallbackText: { ...fonts.medium, fontSize: 12 },
+  mapError: {
+    position: "absolute",
+    left: 12,
+    right: 12,
+    bottom: 12,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: "center",
+    gap: 6,
+  },
+  mapErrorTitle: { ...fonts.semibold, fontSize: 14 },
+  mapErrorText: { ...fonts.regular, fontSize: 12, lineHeight: 17, textAlign: "center" },
   hint: { ...fonts.regular, fontSize: 11, lineHeight: 17 },
   coordinates: { ...fonts.medium, fontSize: 11 },
 });
