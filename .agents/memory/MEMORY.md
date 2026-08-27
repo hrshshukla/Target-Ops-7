@@ -1,0 +1,1 @@
+- [Mappls native credentials](mappls-native-credentials.md) — the installed SDK Gradle plugin requires a matching basename ending in `.a.conf` and `.a.olf`.

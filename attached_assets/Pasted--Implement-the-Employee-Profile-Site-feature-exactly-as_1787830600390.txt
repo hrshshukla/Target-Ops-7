@@ -1,0 +1,310 @@
+
+> **Implement the Employee Profile Site feature exactly as specified below, while also updating the Mappls integration to the current React Native authentication method.**
+>
+> ### IMPORTANT — DO NOT BREAK EXISTING APP
+>
+> * First inspect the existing code and architecture before modifying anything.
+> * Do not redesign unrelated screens.
+> * Preserve the existing dark theme, typography, spacing, cards, colors, navigation, authentication, API endpoints, and existing functionality.
+> * Reuse existing components, APIs, database models, and logic wherever possible.
+>
+> ---
+>
+> ## 1. Employee Profile Changes
+>
+> Update the Admin/Supervisor Employee Profile:
+>
+> Current tabs:
+>
+> * Details
+> * Attendance
+> * Salary
+>
+> Change to:
+>
+> * Details
+> * Site
+> * Salary
+>
+> Remove the separate Attendance tab.
+>
+> ### Details tab
+>
+> Keep the existing employee information UI unchanged:
+>
+> * Employee name
+> * Site
+> * Joining date
+> * Phone number
+> * Profile picture
+> * Employee ID
+>
+> Replace the current Aadhaar section with a compact two-option toggle:
+>
+> `[ Calendar Icon ] [ Document Icon ]`
+>
+> * Document selected by default.
+> * Document → show existing Aadhaar document.
+> * Calendar → show existing Attendance calendar.
+> * Reuse the existing Attendance implementation and API.
+> * Preserve month navigation, Present/Absent behavior and future-date restrictions.
+> * Do not create duplicate attendance logic.
+>
+> ### Site tab
+>
+> Create:
+>
+> 1. Custom Site Name input
+> 2. Mappls address search/autosuggest
+> 3. Map
+> 4. Save Site button
+>
+> Flow:
+>
+> `Custom Site Name → Search Address → Select suggestion → Map moves → Manually move pin → Save Site`
+>
+> **Important:** The selected search result is only the initial map position. The final latitude/longitude must come from the manually positioned pin.
+>
+> If an employee already has a site:
+>
+> * Pre-fill site name.
+> * Pre-fill address if available.
+> * Center map on existing coordinates.
+> * Show existing marker.
+> * Allow editing and saving.
+>
+> Save:
+>
+> * siteName
+> * siteLatitude
+> * siteLongitude
+> * siteAddress
+>
+> Reuse existing backend/site architecture if available. Only add the minimum required schema/API changes.
+>
+> ---
+>
+> ## 2. Mappls — USE THE NEW AUTHENTICATION METHOD
+>
+> **Do NOT use the old Mappls API-key/REST-key authentication method for the React Native Android app.**
+>
+> Use the **current Mappls React Native SDK authentication mechanism using the `.conf` and `.olf` credential files** obtained from the Mappls App/Android credentials console.
+>
+> The Android app must NOT require a manually hardcoded Mappls API key in React Native JavaScript code.
+>
+> Use the current Mappls React Native SDK documentation and authentication flow.
+>
+> ### Credential files
+>
+> Once the Mappls Android/App credential files are provided:
+>
+> * Add the required `.conf` file to the correct Android/Mappls location.
+> * Add the required `.olf` file to the correct Android/Mappls location.
+> * Configure the Android project so these files are packaged correctly into the production application.
+> * Do not put these credentials in `EXPO_PUBLIC_*` environment variables.
+> * Do not hardcode Mappls API keys in `.tsx`/`.ts` files.
+> * Do not use the old Domain/IP-based Web credential for the Android app.
+>
+> **Important:** Do not simply guess the Mappls file paths. Inspect the current Mappls React Native SDK documentation/package and use the exact paths and initialization method required by the SDK version actually installed in this project.
+>
+> ---
+>
+> ## 3. Expo + React Native + EAS compatibility
+>
+> This project uses **Expo + React Native + EAS**.
+>
+> The Mappls integration must work with the project's current Expo/EAS architecture.
+>
+> If Mappls requires native Android configuration:
+>
+> * Use an Expo config plugin/native integration where appropriate.
+> * Do not rely on Expo Go for the Mappls native SDK.
+> * Make the integration compatible with `expo prebuild` and EAS production builds.
+> * Do not make changes that require manually editing generated native files after every `expo prebuild`.
+>
+> The final Android production build must contain the required Mappls `.conf` and `.olf` files and initialize Mappls correctly.
+>
+> ---
+>
+> ## 4. Mappls functionality required
+>
+> Use Mappls for:
+>
+> * Address search/autosuggest
+> * Map rendering
+> * Marker/pin interaction
+> * Geocoding only when actually required
+>
+> Avoid unnecessary Mappls API calls.
+>
+> The final flow should be:
+>
+> `Admin/Supervisor`
+>
+> ↓
+>
+> `Enter Custom Site Name`
+>
+> ↓
+>
+> `Mappls Autosuggest`
+>
+> ↓
+>
+> `Select address`
+>
+> ↓
+>
+> `Map moves to selected location`
+>
+> ↓
+>
+> `Move pin manually`
+>
+> ↓
+>
+> `Capture final latitude/longitude`
+>
+> ↓
+>
+> `Save Site`
+>
+> ↓
+>
+> `Employee site updated`
+>
+> ---
+>
+> ## 5. Geofencing
+>
+> The assigned Site becomes the source of truth for the employee's geofence.
+>
+> For Guards:
+>
+> * Fixed radius: **100 meters**
+> * Use Android device-side location/geofencing capabilities.
+> * Do NOT continuously send GPS coordinates to the server.
+> * Do NOT make API requests for every location update.
+> * Trigger the relevant server event only when the guard crosses outside the 100m boundary.
+> * Prevent repeated exit events while the guard remains outside.
+> * Update local geofence state when the guard returns inside.
+> * Handle permission denial, location services disabled, battery restrictions and unavailable location gracefully.
+> * Never crash because location permission is unavailable.
+>
+> Do not implement continuous server-side GPS tracking.
+>
+> ---
+>
+> ## 6. Backend / Database
+>
+> First inspect the existing employee/site schema and APIs.
+>
+> Reuse existing endpoints if possible.
+>
+> If site coordinates are not currently stored, add only the required fields:
+>
+> * `siteName`
+> * `siteLatitude`
+> * `siteLongitude`
+> * `siteAddress`
+>
+> Follow the project's existing Drizzle/Zod/API architecture.
+>
+> Preserve all existing authorization rules.
+>
+> Never expose:
+>
+> * DATABASE_URL
+> * JWT_SECRET
+> * SESSION_SECRET
+> * Other server secrets
+>
+> to the Expo client.
+>
+> ---
+>
+> ## 7. Performance
+>
+> * Do not continuously poll the server for GPS.
+> * Do not send location every few seconds.
+> * Use Android native geofencing where possible.
+> * Keep server requests event-driven.
+> * Avoid unnecessary Mappls calls.
+> * Cache the selected address locally until Save.
+> * Avoid unnecessary React re-renders.
+> * Clean up map/location/geofence listeners.
+> * Prevent duplicate listeners.
+> * Prevent duplicate exit API requests.
+>
+> ---
+>
+> ## 8. UI
+>
+> Use the existing application's visual language.
+>
+> Preserve:
+>
+> * Dark theme
+> * Existing cards
+> * Rounded corners
+> * Typography
+> * Spacing
+> * Teal accent
+> * Existing navigation/header
+>
+> Do not redesign the entire Employee Profile screen.
+>
+> ---
+>
+> ## 9. VERY IMPORTANT — START THE ACTUAL APP UI
+>
+> When running the project for development/testing:
+>
+> **Start the actual React Native + Expo frontend/app UI.**
+>
+> Do NOT start the API/server as the main process.
+>
+> Do NOT show the Vercel/API/server process as the application UI.
+>
+> The development workflow should launch the Expo/React Native application so I can see and interact with the actual mobile app screens.
+>
+> The API/server should only act as the backend dependency used by the app.
+>
+> ---
+>
+> ## 10. Environment variables
+>
+> The existing production API URL should continue using:
+>
+> `EXPO_PUBLIC_API_URL`
+>
+> Do not hardcode the production API URL into source code.
+>
+> Mappls `.conf` and `.olf` credentials should be handled through the required native Mappls configuration—not `EXPO_PUBLIC_*` variables.
+>
+> ---
+>
+> ## 11. Final verification
+>
+> Before considering the task complete:
+>
+> * Run TypeScript typecheck.
+> * Run API typecheck if backend/schema changes were made.
+> * Verify Admin Employee Profile.
+> * Verify Supervisor Employee Profile.
+> * Verify Details → Calendar/Document toggle.
+> * Verify Site tab.
+> * Verify Mappls map loads.
+> * Verify Mappls address autosuggest.
+> * Verify selecting an address moves the map.
+> * Verify manually moving the pin updates coordinates.
+> * Verify Save Site persists the final coordinates.
+> * Verify existing site loads correctly.
+> * Verify Salary remains unchanged.
+> * Verify Guard receives/uses the assigned 100m geofence.
+> * Verify no continuous GPS API requests are made.
+> * Verify Mappls `.conf` and `.olf` are included correctly in the Android EAS production build.
+> * Verify the app does not depend on Expo Go for the native Mappls functionality.
+>
+> **Do not consider the implementation complete until the actual Expo/React Native frontend can be started and the Mappls integration is working with the new `.conf` + `.olf` authentication method.**
+

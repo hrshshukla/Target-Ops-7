@@ -27,12 +27,21 @@ module.exports = function withMappls(config) {
   return withDangerousMod(config, ["android", async (modConfig) => {
     const appDir = path.join(modConfig.modRequest.platformProjectRoot, "app");
     fs.mkdirSync(appDir, { recursive: true });
-    const credentialsDir = path.join(modConfig.modRequest.projectRoot, "assets", "mappls");
-    for (const extension of [".a.conf", ".a.olf"]) {
-      const source = fs.readdirSync(credentialsDir).find((file) => file.endsWith(extension));
-      if (!source) throw new Error(`Missing Mappls credential file ${extension}`);
-      fs.copyFileSync(path.join(credentialsDir, source), path.join(appDir, source));
+    // The SDK's Gradle plugin looks for a matching *.a.olf/*.a.conf pair in
+    // the generated app directory (and then embeds them into resources/assets).
+    // Keep the files native-only; never pass them through EXPO_PUBLIC_* config.
+    const credentialsDir = path.join(modConfig.modRequest.projectRoot, "attached_assets");
+    const files = fs.readdirSync(credentialsDir);
+    const configSource = files.find((file) => file.endsWith(".conf"));
+    const licenseSource = files.find((file) => file.endsWith(".olf"));
+    if (!configSource || !licenseSource) {
+      throw new Error("Missing Mappls .conf/.olf credential files.");
     }
+    // The SDK Gradle plugin requires these exact suffixes and matching
+    // basenames, regardless of the filenames exported by the credentials
+    // console.
+    fs.copyFileSync(path.join(credentialsDir, configSource), path.join(appDir, "mappls.a.conf"));
+    fs.copyFileSync(path.join(credentialsDir, licenseSource), path.join(appDir, "mappls.a.olf"));
     return modConfig;
   }]);
 };

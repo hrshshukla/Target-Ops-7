@@ -34,6 +34,7 @@ import { fonts } from "@/constants/fonts";
 import { useModal } from "@/components/CustomModal";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useGuardGeofence } from "@/services/geofence";
 
 export default function HomeScreen() {
   const colors = useColors();
@@ -142,6 +143,10 @@ function GuardHomeScreen() {
   const { user } = useAuth();
   const router = useRouter();
   const guard = useGuardMe();
+  const geofenceStatus = useGuardGeofence(
+    guard.data?.siteLatitude,
+    guard.data?.siteLongitude,
+  );
   return (
     <Screen scroll={false}>
       <Header
@@ -194,6 +199,17 @@ function GuardHomeScreen() {
           <Text style={[guardStyles.hint, { color: colors.mutedForeground }]}>
             View your attendance and salary details below.
           </Text>
+          <View
+            style={[
+              guardStyles.geofenceStatus,
+              { backgroundColor: colors.card, borderColor: colors.border },
+            ]}
+          >
+            <Feather name="shield" size={16} color={colors.primary} />
+            <Text style={[guardStyles.geofenceText, { color: colors.secondaryForeground }]}>
+              {geofenceStatus}
+            </Text>
+          </View>
         </View>
       )}
     </Screen>
@@ -208,6 +224,15 @@ const guardStyles = StyleSheet.create({
   meta: { ...fonts.medium, fontSize: 12 },
   heading: { ...fonts.bold, fontSize: 19 },
   hint: { ...fonts.regular, fontSize: 13, lineHeight: 20 },
+  geofenceStatus: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 9,
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 13,
+  },
+  geofenceText: { ...fonts.medium, flex: 1, fontSize: 12, lineHeight: 18 },
 });
 
 function CompanyCard({

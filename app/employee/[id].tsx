@@ -34,6 +34,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
 import { fonts } from "@/constants/fonts";
 import { useModal } from "@/components/CustomModal";
+import { EmployeeSiteTab } from "@/components/EmployeeSiteTab";
 
 export default function EmployeeScreen() {
   const colors = useColors();
@@ -62,7 +63,7 @@ export default function EmployeeScreen() {
     <Screen scroll={false}>
       <Header title="Employee" back />
       <SegmentedControl
-        items={["Details", "Attendance", "Salary"]}
+        items={["Details", "Site", "Salary"]}
         value={tab}
         onChange={setTab}
       />
@@ -72,8 +73,13 @@ export default function EmployeeScreen() {
            canDelete={user?.role === "ADMIN" || user?.role === "SUPERVISOR"}
           onUpdated={() => void employee.refetch()}
         />
-      ) : tab === "Attendance" ? (
-        <AttendanceTab employeeId={id} />
+      ) : tab === "Site" ? (
+        <EmployeeSiteTab
+          employee={employee.data}
+          onSaved={() => {
+            void employee.refetch();
+          }}
+        />
       ) : (
         <SalaryTab
           employeeId={id}
@@ -106,6 +112,7 @@ function DetailsTab({
   const [contact, setContact] = useState(employee.contact);
   const [email, setEmail] = useState(employee.email ?? "");
   const [site, setSite] = useState(employee.site);
+  const [documentView, setDocumentView] = useState<"document" | "calendar">("document");
   const update = useUpdateEmployee();
   const remove = useDeleteEmployee();
   const aadhaar = useGetEmployeeAadhaar(String(employee.employeeId));
@@ -285,10 +292,59 @@ function DetailsTab({
           { backgroundColor: colors.card, borderColor: colors.border },
         ]}
       >
-        <Text style={[styles.aadhaarTitle, { color: colors.foreground }]}>
-          Aadhaar document
-        </Text>
-        {aadhaar.isLoading ? (
+        <View style={styles.detailToggleRow}>
+          <Text style={[styles.aadhaarTitle, { color: colors.foreground }]}>
+            {documentView === "document" ? "Aadhaar document" : "Attendance"}
+          </Text>
+          <View
+            style={[
+              styles.detailToggle,
+              { backgroundColor: colors.secondary, borderColor: colors.border },
+            ]}
+          >
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Show attendance calendar"
+              onPress={() => setDocumentView("calendar")}
+              style={[
+                styles.detailToggleOption,
+                documentView === "calendar" && { backgroundColor: colors.primary },
+              ]}
+            >
+              <Feather
+                name="calendar"
+                size={16}
+                color={
+                  documentView === "calendar"
+                    ? colors.primaryForeground
+                    : colors.mutedForeground
+                }
+              />
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Show Aadhaar document"
+              onPress={() => setDocumentView("document")}
+              style={[
+                styles.detailToggleOption,
+                documentView === "document" && { backgroundColor: colors.primary },
+              ]}
+            >
+              <Feather
+                name="file-text"
+                size={16}
+                color={
+                  documentView === "document"
+                    ? colors.primaryForeground
+                    : colors.mutedForeground
+                }
+              />
+            </Pressable>
+          </View>
+        </View>
+        {documentView === "calendar" ? (
+          <AttendanceTab employeeId={String(employee.employeeId)} />
+        ) : aadhaar.isLoading ? (
           <Text style={[styles.aadhaarMessage, { color: colors.mutedForeground }]}>
             Loading Aadhaar document...
           </Text>
@@ -775,6 +831,27 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     padding: 15,
     marginBottom: 24,
+  },
+  detailToggleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    marginBottom: 10,
+  },
+  detailToggle: {
+    flexDirection: "row",
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 2,
+    gap: 2,
+  },
+  detailToggleOption: {
+    width: 32,
+    height: 28,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
   },
   aadhaarTitle: { ...fonts.bold, fontSize: 16, marginBottom: 10 },
   aadhaarImage: {
