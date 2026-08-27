@@ -18,7 +18,7 @@
       "backgroundColor": "#0A1118"
     },
     "android": {
-      "package": "com.targetsecurity",
+      "package": "com.targetsecurity.application",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/company-logo.png",
         "backgroundColor": "#0A1118"

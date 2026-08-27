@@ -1,0 +1,8 @@
+
+[userenv]
+
+[userenv.shared]
+EXPO_PUBLIC_API_URL = "https://target-ops-7.vercel.app"
+IMAGEKIT_PRIVATE_KEY = "private_bkOUTqd/bsC94w6/vU1d4f2z6es="
+IMAGEKIT_PUBLIC_KEY = "public_KweOSIDRGPLHdvdUGlySINlGbJw="
+IMAGEKIT_URL_ENDPOINT = "https://ik.imagekit.io/hrshshukladev"
