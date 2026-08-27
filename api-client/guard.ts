@@ -27,3 +27,12 @@ export function useGuardSalary(year: number, month: number) {
     queryFn: () => getGuardSalary(year, month),
   });
 }
+
+export type GeofenceEvent = "ENTER" | "EXIT";
+
+export const reportGuardGeofenceEvent = (event: GeofenceEvent) =>
+  customFetch<{ recorded: boolean }>("/api/guard/geofence-events", {
+    method: "POST",
+    body: JSON.stringify({ event }),
+    responseType: "json",
+  });

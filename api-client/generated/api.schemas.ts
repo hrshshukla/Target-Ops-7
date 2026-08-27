@@ -95,6 +95,10 @@ export interface EmployeeInput {
   esic: number;
   profilePictureUrl?: string | null;
   dateOfJoining: string;
+  siteName?: string | null;
+  siteLatitude?: number | null;
+  siteLongitude?: number | null;
+  siteAddress?: string | null;
 }
 
 export type Employee = EmployeeInput & {

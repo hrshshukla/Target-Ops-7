@@ -27,11 +27,19 @@
     "plugins": [
       "expo-router",
       "expo-font",
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-location",
+      "./plugins/withMappls"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "ab201e90-6c76-425d-bace-044b732b3101"
+      }
     }
   }
 }

@@ -69,7 +69,18 @@ const employeeSchema = z.object({
   dateOfJoining: z
     .union([z.string().date(), z.string().datetime({ offset: true })])
     .transform((value) => value.slice(0, 10)),
+  siteName: z.string().trim().nullish(),
+  siteLatitude: z.number().finite().min(-90).max(90).nullish(),
+  siteLongitude: z.number().finite().min(-180).max(180).nullish(),
+  siteAddress: z.string().trim().nullish(),
 });
+const employeeSiteSchema = z.object({
+  siteName: z.string().trim().min(1),
+  siteLatitude: z.number().finite().min(-90).max(90),
+  siteLongitude: z.number().finite().min(-180).max(180),
+  siteAddress: z.string().trim().nullish(),
+});
+const geofenceEventSchema = z.object({ event: z.enum(["ENTER", "EXIT"]) });
 const attendanceSchema = z.object({
   status: z.enum(["PRESENT", "ABSENT"]),
 });
@@ -376,6 +387,10 @@ async function ensureSeed() {
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS company_id TEXT`);
   await pool.query(`ALTER TABLE users ALTER COLUMN email DROP NOT NULL`);
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_picture_url TEXT`);
+  await pool.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS site_name TEXT`);
+  await pool.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS site_latitude NUMERIC`);
+  await pool.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS site_longitude NUMERIC`);
+  await pool.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS site_address TEXT`);
   await pool.query(`CREATE TABLE IF NOT EXISTS user_documents (
     id TEXT PRIMARY KEY, user_id TEXT NOT NULL, document_type TEXT NOT NULL,
     image_url TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -521,6 +536,14 @@ async function ensureSchema() {
       esic NUMERIC NOT NULL DEFAULT 0, profile_picture_url TEXT,
       date_of_joining DATE NOT NULL, deleted_at TIMESTAMPTZ,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`,
+    `ALTER TABLE employees ADD COLUMN IF NOT EXISTS site_name TEXT`,
+    `ALTER TABLE employees ADD COLUMN IF NOT EXISTS site_latitude NUMERIC`,
+    `ALTER TABLE employees ADD COLUMN IF NOT EXISTS site_longitude NUMERIC`,
+    `ALTER TABLE employees ADD COLUMN IF NOT EXISTS site_address TEXT`,
+    `CREATE TABLE IF NOT EXISTS guard_geofence_state (
+      user_id TEXT PRIMARY KEY, outside BOOLEAN NOT NULL DEFAULT FALSE,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )`,
     `ALTER TABLE employees ADD COLUMN IF NOT EXISTS employee_id BIGINT`,
     `ALTER TABLE employees ADD COLUMN IF NOT EXISTS email TEXT`,
@@ -680,6 +703,10 @@ function employeePayload(row: Record<string, unknown>) {
     email: row.email,
     salary: money(row.salary),
     site: row.site,
+    siteName: row.site_name ?? row.site,
+    siteLatitude: row.site_latitude == null ? null : Number(row.site_latitude),
+    siteLongitude: row.site_longitude == null ? null : Number(row.site_longitude),
+    siteAddress: row.site_address ?? null,
     role: row.role,
     basicSalary: money(row.basic_salary),
     allowances: money(row.allowances),
@@ -1126,6 +1153,34 @@ export async function handleManagement(req: ApiRequest, res: ApiResponse): Promi
     return true;
   }
 
+  params = route(req, "POST", "/guard/geofence-events");
+  if (params) {
+    req.params = params;
+    if (!(await authenticate(req, res))) return true;
+    if (!requireRole(req, res, "SECURITY_GUARD")) return true;
+    const body = parseBody(geofenceEventSchema, req, res);
+    if (!body) return true;
+    const outside = body.event === "EXIT";
+    const previous = await pool.query(
+      "SELECT outside FROM guard_geofence_state WHERE user_id=$1",
+      [req.auth!.id],
+    );
+    const wasOutside = Boolean(previous.rows[0]?.outside);
+    if (wasOutside === outside) {
+      res.json({ recorded: false });
+      return true;
+    }
+    await pool.query(
+      `INSERT INTO guard_geofence_state (user_id, outside, updated_at)
+       VALUES ($1,$2,NOW())
+       ON CONFLICT (user_id) DO UPDATE SET outside=EXCLUDED.outside, updated_at=NOW()`,
+      [req.auth!.id, outside],
+    );
+    logger.info({ userId: req.auth!.id, event: body.event }, "Guard geofence boundary event");
+    res.json({ recorded: true });
+    return true;
+  }
+
   params = route(req, "GET", "/guard/attendance");
   if (params) {
     req.params = params;
@@ -1301,8 +1356,10 @@ export async function handleManagement(req: ApiRequest, res: ApiResponse): Promi
     try {
       await pool.query(
         `INSERT INTO employees
-         (id, company_id, employee_id, name, contact, email, salary, site, role, basic_salary, allowances, overtime, pf, esic, profile_picture_url, date_of_joining)
-         VALUES ($1,$2,nextval('employees_employee_id_seq'),$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
+         (id, company_id, employee_id, name, contact, email, salary, site, site_name,
+          site_latitude, site_longitude, site_address, role, basic_salary, allowances,
+          overtime, pf, esic, profile_picture_url, date_of_joining)
+         VALUES ($1,$2,nextval('employees_employee_id_seq'),$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)`,
         [
           id,
           req.params.companyId,
@@ -1311,6 +1368,10 @@ export async function handleManagement(req: ApiRequest, res: ApiResponse): Promi
           normalizeEmail(body.email),
           body.salary,
           body.site,
+          body.siteName ?? body.site,
+          body.siteLatitude ?? null,
+          body.siteLongitude ?? null,
+          body.siteAddress ?? null,
           role,
           body.basicSalary,
           body.allowances,
@@ -1405,15 +1466,21 @@ export async function handleManagement(req: ApiRequest, res: ApiResponse): Promi
     try {
       await client.query("BEGIN");
       await client.query(
-         `UPDATE employees SET name=$1, contact=$2, email=$3, salary=$4, site=$5, role=$6, basic_salary=$7,
-          allowances=$8, overtime=$9, pf=$10, esic=$11, profile_picture_url=$12, date_of_joining=$13, updated_at=NOW()
-          WHERE id=$14 AND company_id=$15 AND deleted_at IS NULL`,
+         `UPDATE employees SET name=$1, contact=$2, email=$3, salary=$4, site=$5,
+          site_name=$6, site_latitude=$7, site_longitude=$8, site_address=$9, role=$10,
+          basic_salary=$11, allowances=$12, overtime=$13, pf=$14, esic=$15,
+          profile_picture_url=$16, date_of_joining=$17, updated_at=NOW()
+          WHERE id=$18 AND company_id=$19 AND deleted_at IS NULL`,
          [
            body.name,
            normalizeMobileNumber(body.contact),
            normalizeEmail(body.email),
            body.salary,
            body.site,
+           body.siteName ?? employee.site_name ?? body.site,
+           body.siteLatitude ?? employee.site_latitude ?? null,
+           body.siteLongitude ?? employee.site_longitude ?? null,
+           body.siteAddress ?? employee.site_address ?? null,
            role,
            body.basicSalary,
            body.allowances,
@@ -1455,6 +1522,32 @@ export async function handleManagement(req: ApiRequest, res: ApiResponse): Promi
     } finally {
       client.release();
     }
+    return true;
+  }
+
+  params = route(req, "PATCH", "/employees/:employeeId/site");
+  if (params) {
+    req.params = params;
+    if (!(await authenticate(req, res)) || !requireManagementRole(req, res)) return true;
+    const body = parseBody(employeeSiteSchema, req, res);
+    if (!body) return true;
+    const employee = await employeeForRequest(req, res);
+    if (!employee) return true;
+    const result = await pool.query(
+      `UPDATE employees
+       SET site=$1, site_name=$1, site_latitude=$2, site_longitude=$3,
+           site_address=$4, updated_at=NOW()
+       WHERE id=$5
+       RETURNING *`,
+      [
+        body.siteName,
+        body.siteLatitude,
+        body.siteLongitude,
+        body.siteAddress?.trim() || null,
+        employee.id,
+      ],
+    );
+    res.json(employeePayload(result.rows[0]));
     return true;
   }
 
